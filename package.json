@@ -1,0 +1,1 @@
+{"name":"camaleon-online","version":"1.0.0","description":"Juego multijugador de camuflaje y escondite","scripts":{"start":"node server.js"},"engines":{"node":">=18"}}

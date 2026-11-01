@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Camaleón Online - Juego multijugador de escondite gratis</title>
+<meta name="description" content="Pinta tu cuerpo para camuflarte con el mapa y escóndete del cazador. Crea una sala y juega gratis con tus amigos, sin registro.">
+<meta name="theme-color" content="#1b1f2a">
+<style>
+:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#1b1f2a;--pn:#262c3b;--ln:#3b4560;--tx:#f2f3f7;--mu:#a7afc4;--ac:#7bd88f}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:Arial,Helvetica,sans-serif}
+.s{display:none;max-width:1180px;margin:0 auto;padding:20px;box-sizing:border-box}
+.s.on{display:block}
+h1{margin:4px 0 8px;font-size:32px}
+.m{color:var(--mu);margin:4px 0;font-size:14px}
+.t{font-size:12px;letter-spacing:1px;color:var(--ac);font-weight:bold}
+button{font-family:inherit;cursor:pointer}
+.b{padding:10px 16px;min-height:44px;box-sizing:border-box;border:2px solid var(--ac);background:transparent;color:var(--ac);font-size:16px;font-weight:bold;border-radius:8px}
+.b.p{background:var(--ac);color:#13301b}
+.b.on{background:var(--ac);color:#13301b}
+.b:disabled{opacity:.4;cursor:default}
+.c{background:var(--pn);border:2px solid var(--ln);border-radius:10px;padding:14px;box-sizing:border-box}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start}
+input[type=text]{padding:10px;min-height:44px;box-sizing:border-box;border:2px solid var(--ln);background:var(--bg);color:var(--tx);border-radius:8px;font-size:16px;width:220px}
+#pl div{padding:8px 0;border-bottom:1px solid var(--ln);font-size:16px}
+#hud{font-size:18px;font-weight:bold;padding:6px 0}
+canvas{background:#000;border-radius:8px;display:block}
+#wc{width:100%;max-width:960px;height:auto}
+#side{width:200px}
+#pc{border:2px solid var(--ln);border-radius:6px;background:#3a4258;touch-action:none;cursor:crosshair}
+.tl{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.tl .b{padding:6px 10px;min-height:40px;font-size:14px}
+#ov{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:rgba(0,0,0,.7);border-radius:8px;text-align:center;font-size:30px;font-weight:bold}
+.big{font-size:42px;letter-spacing:8px;font-weight:bold;color:var(--ac)}
+#hm{max-width:420px;margin:40px auto;text-align:center}
+#hm .b{display:block;width:100%;margin:10px 0}
+#hm input[type=text]{width:100%;text-align:center;margin:6px 0}
+#err{color:#ff8a8a;min-height:20px}
+</style>
+</head>
+<body>
+
+<section class="s on" id="home"><div id="hm">
+<h1>Camaleón Online</h1>
+<p class="m">Pinta tu cuerpo, escóndete y no dejes que el cazador te encuentre. Gratis y sin registro.</p>
+<input type="text" id="hn" maxlength="14" placeholder="Tu nombre">
+<button class="b p" onclick="createRoom()">Crear sala</button>
+<input type="text" id="hc" maxlength="5" placeholder="CÓDIGO" style="text-transform:uppercase;letter-spacing:6px">
+<button class="b" onclick="joinRoom($('#hc').value)">Entrar a sala</button>
+<p id="err"></p></div></section>
+
+<section class="s" id="lobby">
+<span class="t">LOBBY</span>
+<h1>Camaleón: esconde y atrapa</h1>
+<p class="m">Código de sala</p><div class="big" id="code"></div>
+<div class="tl"><button class="b" onclick="copyLink()" id="cp">Copiar link</button><button class="b" onclick="leave()">Salir de la sala</button></div>
+<p class="m" id="conn"></p>
+<div class="row">
+<div class="c" style="width:300px">
+<b>Tu jugador</b><p class="m">Nombre</p>
+<input type="text" id="nm" maxlength="14">
+<p class="m">Personaje (cuerpo blanco)</p>
+<div class="row">
+<button class="b on" id="c0" onclick="setC(0)"><canvas id="p0" width="48" height="60"></canvas><br>Redondo</button>
+<button class="b" id="c1" onclick="setC(1)"><canvas id="p1" width="48" height="60"></canvas><br>Cuadrado</button>
+</div>
+</div>
+<div class="c" style="width:300px"><b>Jugadores en la sala</b><div id="pl"></div></div>
+<div class="c" style="width:300px"><b>Mapa</b><p class="m" id="mh">Solo el anfitrión elige.</p>
+<div class="tl" id="mp"></div>
+<button class="b p" id="go" onclick="startRound()">Iniciar partida</button>
+<p class="m" id="gh"></p>
+</div>
+</div>
+<p class="m">Un cazador se elige al azar. Los camaleones tienen 20 segundos para pintarse y esconderse; luego el cazador tiene 90 segundos para encontrarlos.</p>
+</section>
+
+<section class="s" id="game">
+<div id="hud"></div>
+<div class="row">
+<div style="position:relative;flex:1;min-width:300px;max-width:960px">
+<canvas id="wc" width="960" height="540"></canvas>
+<div id="ov"></div>
+</div>
+<div id="side" class="c">
+<div id="pp">
+<b>Pintura</b>
+<canvas id="pc" width="160" height="240"></canvas>
+<div class="tl">
+<button class="b" id="t-eye" onclick="tool('eye')">Detectar color</button>
+<button class="b on" id="t-br" onclick="tool('br')">Brocha</button>
+<button class="b" id="t-fill" onclick="tool('fill')">Rellenar</button>
+</div>
+<div class="tl" id="sz"></div>
+<b>Poses</b>
+<div class="tl" id="po"></div>
+<input type="color" id="col" value="#ffffff" style="width:100%;height:40px;border:0;background:none">
+<p class="m">Mover: WASD o flechas. Poses: teclas 1 a 4 (C para agacharse). Con Detectar color haz clic en el mapa.</p>
+</div>
+<div id="hp" style="display:none"><b>Eres el cazador</b><p class="m">Cuando termine el tiempo de escondite, haz clic sobre el camaleón que encuentres. Si fallas, esperas 3 segundos.</p></div>
+</div>
+</div>
+</section>
+
+<script>
+const $=s=>document.querySelector(s),W="ffffff".repeat(96),HIDE=20,SEEK=90;
+const MAPS=["Cocina","Jardín","Oficina"];
+let roomCode="",room=null,me={n:"Jugador"+(10+Math.random()*89|0),c:0,x:480,y:300,pt:W,mp:0},cur=null,lastId=0,myPeer="",keys={},cfg={tool:"br",sz:1},lock=0,pcol="#ffffff";
+const bgc=document.createElement("canvas");bgc.width=960;bgc.height=540;
+const wc=$("#wc").getContext("2d"),pcx=$("#pc").getContext("2d");
+
+function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function mapDraw(x,i){
+ const r=rng(i*77+3);
+ if(i==0){
+  x.fillStyle="#d9c9a6";x.fillRect(0,0,960,540);x.strokeStyle="#cbb98f";
+  for(let k=0;k<960;k+=60){x.beginPath();x.moveTo(k,0);x.lineTo(k,540);x.stroke()}
+  for(let k=0;k<540;k+=60){x.beginPath();x.moveTo(0,k);x.lineTo(960,k);x.stroke()}
+  x.fillStyle="#8a6b4a";x.fillRect(0,0,960,90);x.strokeStyle="#6f533a";for(let k=0;k<960;k+=120)x.strokeRect(k,0,120,90);
+  x.fillStyle="#c9d3d6";x.fillRect(820,100,100,200);x.fillStyle="#b5835a";x.fillRect(360,230,240,130);
+  x.fillStyle="#4f7f8a";x.fillRect(100,360,260,140);x.fillStyle="#e8e4da";for(let k=0;k<3;k++){x.beginPath();x.arc(410+k*70,295,20,0,7);x.fill()}
+  x.fillStyle="#555";x.fillRect(640,0,120,90);x.fillStyle="#b5835a";x.fillRect(680,400,200,90);
+ }else if(i==1){
+  x.fillStyle="#5b8f3a";x.fillRect(0,0,960,540);x.fillStyle="#4e8032";for(let k=0;k<60;k++){x.beginPath();x.ellipse(r()*960,r()*540,30+r()*30,15+r()*20,0,0,7);x.fill()}
+  x.fillStyle="#c2a878";x.fillRect(0,250,960,70);x.fillStyle="#7b5a3a";x.fillRect(0,0,960,50);for(let k=0;k<960;k+=40)x.fillRect(k,0,12,60);
+  const f=["#e8c547","#d9534f","#f2f2f2","#b36bd6"];for(let k=0;k<90;k++){x.fillStyle=f[k%4];x.beginPath();x.arc(r()*960,60+r()*480,4,0,7);x.fill()}
+  x.fillStyle="#3f7fb5";x.beginPath();x.ellipse(720,430,120,60,0,0,7);x.fill();x.fillStyle="#3f7a2c";for(let k=0;k<7;k++){x.beginPath();x.arc(80+k*140,120,34,0,7);x.fill()}
+ }else{
+  x.fillStyle="#6f7f99";x.fillRect(0,0,960,540);x.fillStyle="#d8d8d8";x.fillRect(0,0,960,70);x.fillStyle="#9ec5e8";for(let k=0;k<5;k++)x.fillRect(40+k*190,12,120,46);
+  for(let a=0;a<3;a++)for(let b=0;b<2;b++){const X=90+a*300,Y=150+b*190;x.fillStyle="#a58b6a";x.fillRect(X,Y,180,80);x.fillStyle="#2f3640";x.fillRect(X+60,Y+8,60,30);x.fillStyle="#444";x.beginPath();x.arc(X+90,Y+110,22,0,7);x.fill()}
+  x.fillStyle="#3d7a4a";[[30,120],[930,300],[40,500],[920,500]].forEach(p=>{x.beginPath();x.arc(p[0],p[1],26,0,7);x.fill()});
+ }
+}
+function cell(c,cx,cy){
+ if(cy<4){if(cx<2||cx>5)return 0;if(c==0){if(cy==0||cy==3)return cx==3||cx==4;return 1}return 1}
+ if(cy<9)return cx>=2&&cx<=5||(cy<8&&(cx==1||cx==6));
+ return cx>=2&&cx<=5;
+}
+const POSE=[["De pie",1,1],["Agachado",1,.65],["Bolita",.6,.5],["De lado",.45,1]];
+function fig(x,px,py,c,pt,s,po){
+ const q=POSE[po||0],sx=q[1]*s,sy=q[2]*s,X=px+(8*s-8*sx)/2,Y=py+12*s-12*sy;
+ for(let cy=0;cy<12;cy++)for(let cx=0;cx<8;cx++)if(cell(c,cx,cy)){x.fillStyle="#"+pt.substr((cy*8+cx)*6,6);x.fillRect(X+cx*sx,Y+cy*sy,sx+.5,sy+.5)}
+}
+function setPose(n){if(!cur||cur.role!="c"||amCaught())return;me.po=n;push({po:n});[...$("#po").children].forEach((b,i)=>b.classList.toggle("on",i==n))}
+function setC(c){me.c=c;$("#c0").classList.toggle("on",c==0);$("#c1").classList.toggle("on",c==1);push({c})}
+function push(p){if(room)room.presence(p).catch(()=>{})}
+function peers(){return room?room.peers().filter(p=>p.kind=="viewer"):[]}
+function hostOf(P){return[...P].sort((a,b)=>a.peer<b.peer?-1:1)[0]}
+function show(id){document.querySelectorAll(".s").forEach(e=>e.classList.toggle("on",e.id==id))}
+
+$("#nm").value=me.n;$("#nm").oninput=e=>{me.n=e.target.value.slice(0,14)||"Jugador";push({n:me.n})};
+fig($("#p0").getContext("2d"),8,0,0,W,4);fig($("#p1").getContext("2d"),8,0,1,W,4);
+$("#mp").innerHTML=MAPS.map((m,i)=>`<button class="b${i==0?" on":""}" data-m="${i}">${m}</button>`).join("");
+$("#mp").onclick=e=>{const m=e.target.dataset.m;if(m==null)return;const P=peers(),h=hostOf(P);if(h&&h.peer==myPeer){me.mp=+m;push({mp:me.mp})}};
+$("#po").innerHTML=POSE.map((q,i)=>`<button class="b${i==0?" on":""}" onclick="setPose(${i})">${i+1} ${q[0]}</button>`).join("");
+$("#sz").innerHTML=[1,2,3].map(n=>`<button class="b${n==1?" on":""}" data-z="${n}">${n}x${n}</button>`).join("");
+$("#sz").onclick=e=>{const z=e.target.dataset.z;if(z){cfg.sz=+z;[...$("#sz").children].forEach(b=>b.classList.toggle("on",b.dataset.z==z));tool("br")}};
+$("#col").oninput=e=>pcol=e.target.value;
+function tool(t){cfg.tool=t;["eye","br","fill"].forEach(k=>$("#t-"+k).classList.toggle("on",k==t))}
+
+function startRound(){
+ const P=peers(),h=hostOf(P);if(!h||h.peer!=myPeer||P.length<2)return;
+ const hun=P[Math.random()*P.length|0].peer;
+ push({rs:{id:Date.now(),map:me.mp,h:hun,t0:Date.now()+1500,p:P.map(p=>p.peer)},k:null});
+}
+function begin(rs){
+ cur={id:rs.id,map:rs.map,h:rs.h,t0:rs.t0,p:rs.p,role:rs.h==myPeer?"h":"c",ended:null};
+ const g=document.createElement("canvas");mapDraw(bgc.getContext("2d"),rs.map);
+ me.x=80+Math.random()*800;me.y=110+Math.random()*380;me.pt=W;lock=0;
+ me.po=0;push({x:me.x,y:me.y,pt:W,k:null,po:0});[...$("#po").children].forEach((b,i)=>b.classList.toggle("on",i==0));
+ $("#pp").style.display=cur.role=="c"?"block":"none";$("#hp").style.display=cur.role=="h"?"block":"none";
+ $("#wc").style.cursor=cur.role=="h"?"crosshair":"default";
+ drawPc();show("game");
+}
+function toLobby(){cur=null;show("lobby")}
+function endBtn(){push({rs:null,k:null})}
+
+function drawPc(){
+ pcx.clearRect(0,0,160,240);
+ for(let cy=0;cy<12;cy++)for(let cx=0;cx<8;cx++)if(cell(me.c,cx,cy)){pcx.fillStyle="#"+me.pt.substr((cy*8+cx)*6,6);pcx.fillRect(cx*20,cy*20,20,20);pcx.strokeStyle="rgba(0,0,0,.18)";pcx.strokeRect(cx*20,cy*20,20,20)}
+}
+function paintAt(cx,cy){
+ if(cx<0||cy<0||cx>7||cy>11||!cell(me.c,cx,cy))return;
+ const hex=pcol.slice(1);let a=me.pt.match(/.{6}/g);
+ if(cfg.tool=="fill"){
+  const from=a[cy*8+cx];if(from==hex)return;const st=[[cx,cy]];
+  while(st.length){const[x,y]=st.pop();if(x<0||y<0||x>7||y>11||!cell(me.c,x,y)||a[y*8+x]!=from)continue;a[y*8+x]=hex;st.push([x+1,y],[x-1,y],[x,y+1],[x,y-1])}
+ }else{
+  const o=Math.floor((cfg.sz-1)/2);
+  for(let i=0;i<cfg.sz;i++)for(let j=0;j<cfg.sz;j++){const x=cx-o+i,y=cy-o+j;if(x>=0&&y>=0&&x<8&&y<12&&cell(me.c,x,y))a[y*8+x]=hex}
+ }
+ me.pt=a.join("");drawPc();clearTimeout(paintAt.t);paintAt.t=setTimeout(()=>push({pt:me.pt}),120);
+}
+let down=false;
+function pcEv(e){const r=$("#pc").getBoundingClientRect();paintAt(Math.floor((e.clientX-r.left)/r.width*8),Math.floor((e.clientY-r.top)/r.height*12))}
+$("#pc").onpointerdown=e=>{if(!cur||cur.role!="c"||amCaught())return;down=true;pcEv(e)};
+$("#pc").onpointermove=e=>{if(down&&cfg.tool=="br")pcEv(e)};
+addEventListener("pointerup",()=>down=false);
+$("#wc").onpointerdown=e=>{
+ if(!cur||cur.ended)return;const r=$("#wc").getBoundingClientRect(),x=(e.clientX-r.left)/r.width*960,y=(e.clientY-r.top)/r.height*540;
+ if(cur.role=="c"&&cfg.tool=="eye"){const d=bgc.getContext("2d").getImageData(x|0,y|0,1,1).data;pcol="#"+[...d].slice(0,3).map(v=>v.toString(16).padStart(2,"0")).join("");$("#col").value=pcol;tool("br");return}
+ if(cur.role=="h"&&phase()=="seek"&&Date.now()>lock){
+  const hit=alive().find(p=>{const q=POSE[p.presence.po||0];return Math.abs(p.presence.x-x)<=16*q[1]&&y>=p.presence.y+24-48*q[2]&&y<=p.presence.y+24});
+  if(hit){const k=[...caught(),hit.peer];push({k})}else lock=Date.now()+3000;
+ }
+};
+addEventListener("keydown",e=>{keys[e.code]=1;if(cur&&document.activeElement.tagName!="INPUT"){if(/^Digit[1-4]$/.test(e.code))setPose(+e.code.slice(5)-1);if(e.code=="KeyC")setPose(me.po==1?0:1)}if(cur&&/Arrow|Space/.test(e.code)&&document.activeElement.tagName!="INPUT")e.preventDefault()});
+addEventListener("keyup",e=>keys[e.code]=0);
+
+function phase(){const el=(Date.now()-cur.t0)/1000;return el<0?"wait":el<HIDE?"hide":el<HIDE+SEEK?"seek":"over"}
+function hunterP(){return peers().find(p=>p.peer==cur.h)}
+function caught(){const h=hunterP();return h&&h.presence.k||[]}
+function amCaught(){return caught().includes(myPeer)}
+function alive(){const k=caught();return peers().filter(p=>cur.p.includes(p.peer)&&p.peer!=cur.h&&!k.includes(p.peer)&&p.presence.x!=null)}
+
+let lastPush=0;
+function tick(){
+ requestAnimationFrame(tick);
+ if(!room)return;
+ const P=peers(),mine=P.find(p=>p.isMe&&p.sameTab);if(mine)myPeer=mine.peer;
+ const h=hostOf(P),rs=h&&h.presence.rs;
+ if(!cur&&rs&&rs.id!=lastId){lastId=rs.id;if(rs.p.includes(myPeer))begin(rs)}
+ if(cur&&(!rs||rs.id!=cur.id)){toLobby()}
+ if(!cur){lobbyUi(P,h);return}
+ const ph=phase();
+ if(cur.role=="c"&&!amCaught()&&ph!="over"&&!cur.ended){
+  const dx=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0),dy=(keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0);
+  if(dx||dy){const d=Math.hypot(dx,dy),sp=2.6*(me.po?.6:1);me.x=Math.max(30,Math.min(930,me.x+dx/d*sp));me.y=Math.max(40,Math.min(510,me.y+dy/d*sp));
+   if(Date.now()-lastPush>90){lastPush=Date.now();push({x:Math.round(me.x),y:Math.round(me.y)})}}
+ }
+ if(!cur.ended){
+  if(ph=="over")cur.ended="Camaleones";
+  else if(ph!="wait"&&alive().length==0)cur.ended="Cazador";
+ }
+ drawGame(ph);
+}
+function drawGame(ph){
+ wc.drawImage(bgc,0,0);
+ const k=caught();
+ peers().forEach(p=>{if(!cur.p.includes(p.peer)||p.peer==cur.h||k.includes(p.peer)||p.presence.x==null)return;
+  if(p.peer==myPeer){fig(wc,me.x-16,me.y-24,me.c,me.pt,4,me.po);const ty=me.y+24-48*POSE[me.po||0][2]-4;wc.fillStyle="#7bd88f";wc.beginPath();wc.moveTo(me.x,ty);wc.lineTo(me.x-5,ty-10);wc.lineTo(me.x+5,ty-10);wc.fill()}
+  else fig(wc,p.presence.x-16,p.presence.y-24,p.presence.c||0,p.presence.pt||W,4,p.presence.po)});
+ const ov=$("#ov"),sec=Math.ceil((cur.t0+(HIDE+SEEK)*1000-Date.now())/1000);
+ let t="",hud=(cur.role=="h"?"Cazador":"Camaleón")+" · "+MAPS[cur.map]+" · Vivos: "+alive().length;
+ if(ph=="wait")t="Preparando…";
+ else if(ph=="hide"){const s=Math.ceil(HIDE-(Date.now()-cur.t0)/1000);hud+=" · Escondite: "+s+" s";if(cur.role=="h")t="Los camaleones se esconden…<br>"+s}
+ else if(ph=="seek")hud+=" · Tiempo: "+sec+" s"+(cur.role=="h"&&Date.now()<lock?" · Fallaste, espera":"");
+ if(cur.role=="c"&&amCaught())hud+=" · Te atraparon";
+ if(cur.ended){const host=hostOf(peers());t="Ganan los "+cur.ended+(host&&host.peer==myPeer?'<br><button class="b p" onclick="endBtn()">Volver al lobby</button>':'<br><span class="m">Esperando al anfitrión…</span>')}
+ ov.style.display=t?"flex":"none";ov.innerHTML=t;
+ if(cur.role=="h"&&ph=="hide"){ov.style.background="#000"}else ov.style.background="rgba(0,0,0,.7)";
+ $("#hud").textContent=hud;
+}
+function lobbyUi(P,h){
+ const hs=h&&h.peer==myPeer;
+ $("#pl").innerHTML=[...P].sort((a,b)=>a.peer<b.peer?-1:1).map(p=>`<div>${(p.presence.n||"Jugador").replace(/[<>&]/g,"")} · ${p.presence.c==1?"cuadrado":"redondo"}${h&&p.peer==h.peer?" · anfitrión":""}${p.peer==myPeer?" · tú":""}</div>`).join("");
+ const mp=h&&h.presence.mp||0;[...$("#mp").children].forEach(b=>b.classList.toggle("on",b.dataset.m==mp));
+ $("#mh").textContent=hs?"Elige el mapa y empieza.":"Solo el anfitrión elige.";
+ $("#go").style.display=hs?"inline-block":"none";$("#go").disabled=P.length<2;
+ $("#gh").textContent=hs&&P.length<2?"Se necesitan al menos 2 jugadores.":hs?"":"Esperando que el anfitrión inicie…";
+ if(h&&h.presence.rs&&!cur)$("#gh").textContent="Hay una ronda en curso. Espera a que termine.";
+}
+function Net(code){
+ const id=Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4),R=new Map(),mine={};let pend={},tm=0;
+ const ap=(o,p)=>{for(const k in p){if(p[k]===null)delete o[k];else o[k]=p[k]}};
+ const send=()=>{tm=0;const b=pend;pend={};fetch("/api/presence",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({room:code,id,patch:b})}).catch(()=>{})};
+ const es=new EventSource("/api/events?room="+code+"&id="+id);
+ es.onopen=()=>{pend=Object.assign({},mine);send()};
+ es.onmessage=e=>{const m=JSON.parse(e.data);if(m.t=="s"){R.clear();for(const k in m.peers)R.set(k,m.peers[k])}else if(m.t=="p"){const o=R.get(m.id)||{};ap(o,m.patch);R.set(m.id,o)}else if(m.t=="l")R.delete(m.id)};
+ return{presence(p){ap(mine,p);Object.assign(pend,p);if(!tm)tm=setTimeout(send,60);return Promise.resolve()},
+  peers(){const a=[{peer:id,isMe:true,sameTab:true,kind:"viewer",presence:mine}];R.forEach((v,k)=>{if(k!=id)a.push({peer:k,isMe:false,sameTab:false,kind:"viewer",presence:v})});return a},
+  close(){es.close()}}
+}
+function err(t){$("#err").textContent=t}
+function enter(code){
+ me.n=($("#hn").value.trim()||me.n).slice(0,14);$("#nm").value=me.n;roomCode=code;room=Net(code);
+ $("#code").textContent=code;$("#conn").textContent="Comparte el código o el link con tus amigos.";
+ history.replaceState(null,"","?sala="+code);room.presence({n:me.n,c:me.c,mp:0});show("lobby");
+}
+async function createRoom(){try{const r=await(await fetch("/api/create",{method:"POST"})).json();enter(r.code)}catch(e){err("No se pudo crear la sala. Intenta otra vez.")}}
+async function joinRoom(c){
+ c=(c||"").toUpperCase().trim();if(c.length<3)return err("Escribe el código de la sala.");
+ try{const r=await(await fetch("/api/room?code="+encodeURIComponent(c))).json();if(!r.ok)return err("Sala no encontrada o llena.");enter(c)}catch(e){err("No se pudo conectar.")}
+}
+function leave(){if(room)room.close();room=null;cur=null;lastId=0;history.replaceState(null,"",location.pathname);show("home")}
+function copyLink(){const u=location.origin+location.pathname+"?sala="+roomCode;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>$("#cp").textContent="¡Link copiado!").catch(()=>prompt("Copia este link:",u))}
+{const q=(new URLSearchParams(location.search).get("sala")||"").toUpperCase().slice(0,5);if(q){$("#hc").value=q;err("Te invitaron a la sala "+q+". Pon tu nombre y toca Entrar a sala.")}}
+$("#hn").value=me.n;
+tick();
+</script>
+</body>
+</html>
